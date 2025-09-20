@@ -91,13 +91,13 @@
       </div>
       <div class="row" style="gap:10px">
         <span id="status" class="chip">offline</span>
-        <button id="btnOwner" class="ghost" title="Owner panel (store key locally)">⚙️ Owner</button>
+        <button id="btnOwner" class="ghost" title="Owner panel">⚙️ Owner</button>
       </div>
     </header>
 
     <section class="hero">
       <h2>Greenhouse · Live</h2>
-      <p>Device <strong>pi5-greenhouse-01</strong>. Pulls securely from Azure Functions (key stays in your browser).</p>
+      <p>Device <strong>pi5-greenhouse-01</strong>. Pulls via Cloudflare Worker (keyless).</p>
       <div class="controls">
         <button id="btnRefresh" class="primary">Refresh</button>
         <span class="chip" id="lastSync">no data yet</span>
@@ -108,15 +108,15 @@
         <div class="row" style="gap:12px; flex-wrap:wrap">
           <div style="flex: 1 1 240px">
             <div class="muted" style="font-size:12px">Cloud Host</div>
-            <input id="host" spellcheck="false" value="https://func-areka-hydro-sn-fzdja9egd8htaycm.switzerlandnorth-01.azurewebsites.net" />
+            <input id="host" spellcheck="false" value="https://d3m3t3r.me" />
           </div>
           <div style="flex: 1 1 240px">
             <div class="muted" style="font-size:12px">Device Id</div>
             <input id="device" spellcheck="false" value="pi5-greenhouse-01" />
           </div>
           <div style="flex: 1 1 320px">
-            <div class="muted" style="font-size:12px">Function Key (stored only in this browser)</div>
-            <input id="fnkey" spellcheck="false" placeholder="paste once → stays local" />
+            <div class="muted" style="font-size:12px">Function Key (unused in keyless mode)</div>
+            <input id="fnkey" spellcheck="false" placeholder="keyless via Worker" />
           </div>
         </div>
         <div class="controls" style="margin-top:12px">
@@ -198,14 +198,14 @@
     </main>
 
     <footer>
-      Built for the Areka greenhouse • d3m3t3r.me • Auto refresh every <span id="every">30s</span>. Your key never leaves your browser.
+      Built for the Areka greenhouse • d3m3t3r.me • Auto refresh every <span id="every">30s</span>. Keyless via Cloudflare Worker.
     </footer>
   </div>
 
   <script>
     // ——— Settings (persisted locally) ———
     const S = {
-      get host(){ return localStorage.getItem('demeter.host') || 'https://func-areka-hydro-sn-fzdja9egd8htaycm.switzerlandnorth-01.azurewebsites.net'; },
+      get host(){ return localStorage.getItem('demeter.host') || 'https://d3m3t3r.me'; },
       set host(v){ localStorage.setItem('demeter.host', v.trim()); },
       get device(){ return localStorage.getItem('demeter.device') || 'pi5-greenhouse-01'; },
       set device(v){ localStorage.setItem('demeter.device', v.trim()); },
@@ -227,7 +227,7 @@
       const d = h/24; return `${Math.floor(d)}d ago`;
     };
 
-    // 🔧 Canonicalize sensor keys so "tds" appears under the TDS (ppm) card
+    // Canonicalize sensor keys (map 'tds' -> 'tdsppm', etc.)
     function canonSensor(name){
       const l = (name||'').toString().toLowerCase();
       switch(l){
@@ -257,7 +257,7 @@
       for(const it of arr){
         const c = it.c || it;
         const raw = c.sensor || c.type || 'unknown';
-        const k = canonSensor(raw);              // 👈 use canonical key
+        const k = canonSensor(raw);
         (m.get(k) || m.set(k, []).get(k)).push(c);
       }
       for(const [k,v] of m) v.sort((a,b)=> new Date(b.ts)-new Date(a.ts));
@@ -271,10 +271,7 @@
       const norm = v => max===min ? h/2 : h - ((v-min)/(max-min))*h;
       const step = (w-2*pad)/(values.length-1);
       let d='M '+pad+' '+norm(values[0]).toFixed(2);
-      values.forEach((v,i)=>{
-        if(i===0) return;
-        d+=' L '+(pad+i*step).toFixed(2)+' '+norm(v).toFixed(2);
-      });
+      values.forEach((v,i)=>{ if(i>0) d+=' L '+(pad+i*step).toFixed(2)+' '+norm(v).toFixed(2); });
       el.innerHTML = `<path d="${d}" fill="none" stroke="url(#g)" stroke-width="1.5"/>`
                     + `<defs><linearGradient id="g" x1="0" x2="1"><stop offset="0%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--brand').trim()}"/><stop offset="100%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--brand-2').trim()}"/></linearGradient></defs>`;
     };
@@ -316,20 +313,17 @@
     });
     els.btnClear.addEventListener('click', () => {
       S.key=''; els.fnkey.value='';
-      alert('Key cleared from this browser.');
+      alert('Key cleared from this browser (not needed in keyless mode).');
     });
-    els.btnConnect.addEventListener('click', async () => {
-      await refresh();
-    });
+    els.btnConnect.addEventListener('click', async () => { await refresh(); });
     els.btnRefresh.addEventListener('click', () => refresh());
 
-    // ——— Fetch from Cloud ———
+    // ——— Fetch from Cloud (keyless via Worker) ———
     async function fetchCloud(top=120){
-      if(!S.key){ throw new Error('No function key set'); }
       const url = new URL('/api/Probes', S.host);
       url.searchParams.set('deviceId', S.device);
       url.searchParams.set('top', String(top));
-      url.searchParams.set('code', S.key);
+      // No 'code' param — Cloudflare Worker injects it server-side
       const r = await fetch(url.toString(), { cache:'no-store' });
       if(!r.ok) throw new Error('HTTP '+r.status);
       const data = await r.json();
@@ -378,14 +372,13 @@
     // ——— Refresh flow ———
     async function refresh(){
       try{
-        if(!S.key){ alert('Owner: paste your Function key in the panel and Save.'); return; }
         setStatus(false);
         els.lastSync.textContent = 'fetching…';
         const list = await fetchCloud(200);
         const map = bySensor(list);
 
         renderLatest(map, 'ph',       els.ph,    '',   2);
-        renderLatest(map, 'tdsppm',   els.tds,   'ppm',0); // now populated via canonSensor()
+        renderLatest(map, 'tdsppm',   els.tds,   'ppm',0);
         renderLatest(map, 'waterC',   els.water, '°C', 1);
         renderLatest(map, 'tempC',    els.air,   '°C', 1);
         renderLatest(map, 'humidity', els.hum,   '%',  0);
@@ -404,10 +397,10 @@
     const EVERY = 30_000;
     els.every.textContent = (EVERY/1000)+'s';
     els.autoEvery.textContent = (EVERY/1000)+'s';
-    setInterval(() => { if(S.key) refresh(); }, EVERY);
+    setInterval(refresh, EVERY);
 
-    // Kick once if key already saved
-    if(S.key){ refresh(); }
+    // Kick once on load
+    refresh();
   </script>
 </body>
 </html>
