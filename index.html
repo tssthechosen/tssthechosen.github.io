@@ -1,318 +1,385 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>d3m3t3r • Greenhouse Live</title>
+  <title>d3m3t3r — Greenhouse Telemetry</title>
   <meta name="color-scheme" content="dark light" />
-  <link href="https://cdn.jsdelivr.net/npm/@picocss/pico@1.5.10/css/pico.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <meta name="description" content="Live hydroponics telemetry and device health for the Areka greenhouse." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2738%27 fill=%27%2300c36a%27/%3E%3Cpath d=%27M50 18c12 9 18 19 18 30 0 14-10 26-18 34-8-8-18-20-18-34 0-11 6-21 18-30z%27 fill=%27%23007346%27/%3E%3C/svg%3E" />
   <style>
     :root {
-      --card-bg: rgba(255,255,255,0.02);
-      --muted: #9aa2b2;
-      --up:#2dd4bf; --down:#f43f5e; --accent:#60a5fa; --accent2:#34d399;
+      --bg: #0c0f12;
+      --panel: #12161b;
+      --muted: #8892a6;
+      --text: #e6edf3;
+      --brand: #00c36a;
+      --brand-2: #4ae3a1;
+      --warn: #ffa629;
+      --bad: #ff5468;
+      --good: #3bd671;
+      --card: #0f1318;
+      --border: #1b222b;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
     }
-    body { background:#0b1220 }
-    main.container { max-width: 1100px; }
-    .chip { font-size:.75rem; padding:.25rem .6rem; border-radius:999px; background:var(--card-bg); border:1px solid rgba(255,255,255,.06) }
-    .chip.success { color:#10b981; border-color: rgba(16,185,129,.35) }
-    .chip.danger  { color:#f43f5e; border-color: rgba(244,63,94,.35) }
-    .panel { background:var(--card-bg); border:1px solid rgba(255,255,255,.06); border-radius:.8rem; padding:1rem }
-    .muted { color:var(--muted) }
-    .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
-    .owner-grid { display:grid; gap:.75rem; grid-template-columns: 1.6fr 1fr 1.6fr auto auto; align-items:end }
-    @media (max-width: 900px){ .owner-grid { grid-template-columns: 1fr } }
-    .grid-3 { display:grid; gap:1rem; grid-template-columns:repeat(3,minmax(0,1fr)) }
-    .grid-2 { display:grid; gap:1rem; grid-template-columns:repeat(2,minmax(0,1fr)) }
-    @media (max-width: 1000px){ .grid-3 { grid-template-columns:1fr } .grid-2{ grid-template-columns:1fr } }
-    .kpi { display:flex; align-items:baseline; gap:.5rem }
-    .value { font-size:2.25rem; font-weight:800; letter-spacing:-.02em }
-    .spark { height:140px }
-    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace }
-    .right { text-align:right }
-    .table-wrap { overflow:auto; max-height:520px }
-    .ghost { background:transparent; border:1px solid rgba(255,255,255,.08) }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg: #f7fafc; --panel: #ffffff; --card:#ffffff; --text:#0c1117; --muted:#5c677d; --border:#e8eef4; 
+        --shadow: 0 10px 20px rgba(16,24,40,.08);
+      }
+    }
+    * {box-sizing:border-box}
+    html,body {margin:0;padding:0;background:var(--bg); color:var(--text); font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";}
+    a {color: var(--brand-2); text-decoration: none}
+    a:hover {text-decoration: underline}
+    .container {max-width:1100px;margin:0 auto;padding:28px}
+    header {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px}
+    .brand {display:flex;gap:12px;align-items:center}
+    .logo {width:36px;height:36px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(135deg,var(--brand),var(--brand-2));box-shadow:var(--shadow)}
+    h1 {margin:0;font-size: clamp(22px, 2.2vw, 28px);letter-spacing:.3px}
+    .chip {font-size:12px;padding:4px 10px;border-radius:999px;background:#10161c;border:1px solid var(--border);color:var(--muted)}
+    main {display:grid;gap:18px}
+    .hero {background:linear-gradient(145deg, rgba(0,195,106,.06), rgba(0,0,0,0)); border:1px solid var(--border);border-radius:var(--radius); padding:20px}
+    .hero h2 {margin:0 0 6px 0; font-size: clamp(20px,2vw,24px)}
+    .hero p {margin:0;color:var(--muted)}
+    .controls {display:flex;flex-wrap:wrap;gap:10px; align-items:center;margin-top:14px}
+    button, input, select {
+      background: var(--card); color:var(--text); border:1px solid var(--border);
+      border-radius:10px; padding:9px 12px; font: inherit;
+    }
+    button {cursor:pointer}
+    button.primary {background:linear-gradient(135deg,var(--brand),var(--brand-2)); color:#00110a; border:none; font-weight:600}
+    button.ghost {background:transparent}
+    .grid {display:grid; gap:16px; grid-template-columns: repeat(12,1fr)}
+    .card {grid-column: span 12; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px}
+    .card h3 {margin:0 0 2px 0; font-size: 14px; color:var(--muted); font-weight:600; letter-spacing:.3px}
+    .big {font-size: clamp(26px, 4vw, 36px); font-weight: 800; letter-spacing:.3px; margin: 4px 0}
+    .sub {color:var(--muted); font-size: 13px}
+    .trend {font-size: 12px; font-weight:600}
+    .good {color: var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+    .row {display:flex; align-items:center; justify-content:space-between; gap:16px}
+    .spark {height:38px; width:100%; display:block}
+    .half {grid-column: span 6}
+    .third {grid-column: span 4}
+    .panel {background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px}
+    .owner {display:none}
+    .owner.open {display:block}
+    .muted {color: var(--muted)}
+    footer {margin:26px 0 8px 0; color:var(--muted); font-size:13px}
+    .kbd {font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; background:#0e141a;border:1px solid var(--border); padding:2px 6px; border-radius:6px; color:var(--muted); font-size:12px}
+    @media (max-width: 860px){
+      .half {grid-column: span 12}
+      .third {grid-column: span 6}
+    }
+    @media (max-width: 560px){
+      .third {grid-column: span 12}
+    }
   </style>
 </head>
 <body>
-<main class="container">
-  <header style="margin:.5rem 0 0">
-    <hgroup>
-      <h2 style="margin:.25rem 0">d3m3t3r</h2>
-      <p class="muted">Areka greenhouse telemetry — privacy first, owner-controlled.</p>
-    </hgroup>
-  </header>
-
-  <section class="panel">
-    <div class="row" style="justify-content:space-between">
-      <h3 style="margin:.3rem 0">Greenhouse • Live</h3>
-      <div class="row">
-        <span id="statusChip" class="chip">offline</span>
-        <button id="ownerToggle" class="chip ghost" type="button">⚙ Owner</button>
-      </div>
-    </div>
-    <p class="muted">Device <strong class="mono" id="deviceIdText">—</strong>. Pulls securely from Azure Functions (key stays in your browser).</p>
-    <div class="row" style="margin:.2rem 0 .6rem">
-      <button id="btnRefresh" class="secondary">Refresh</button>
-      <span id="syncBadge" class="chip">error – Failed to fetch</span>
-      <button id="btnAuto" class="ghost">Auto-refresh 30s</button>
-    </div>
-
-    <div id="ownerPanel" class="panel" style="display:none; margin-top:.75rem">
-      <div class="owner-grid">
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true">🌿</div>
         <div>
-          <label for="host">Cloud Host</label>
-          <input id="host" type="url" placeholder="https://func-...azurewebsites.net">
+          <h1>d3m3t3r</h1>
+          <div class="muted" style="font-size:12px;line-height:1.2">
+            Areka greenhouse telemetry – privacy first, owner-controlled.
+          </div>
         </div>
-        <div>
-          <label for="deviceId">Device Id</label>
-          <input id="deviceId" type="text" placeholder="pi5-greenhouse-01">
-        </div>
-        <div>
-          <label for="fnKey">Function Key (kept only in this browser)</label>
-          <input id="fnKey" type="password" autocomplete="off">
-        </div>
-        <div><button id="btnSave" class="secondary" style="margin-top:1.6rem">Save</button></div>
-        <div><button id="btnConnect" class="secondary" style="margin-top:1.6rem">Connect</button></div>
       </div>
-      <div class="row" style="margin-top:.5rem">
-        <button id="btnClearKey" class="ghost">Clear key</button>
-        <small class="muted">Tip: press <span class="mono">g</span> then <span class="mono">o</span> to toggle Owner panel.</small>
+      <div class="row" style="gap:10px">
+        <span id="status" class="chip">offline</span>
+        <button id="btnOwner" class="ghost" title="Owner panel (store key locally)">⚙️ Owner</button>
       </div>
-    </div>
-  </section>
+    </header>
 
-  <section class="grid-3" style="margin-top:1rem">
-    <article class="panel">
-      <header class="muted">pH</header>
-      <div class="kpi"><div class="value" id="phValue">—</div><small id="phDelta"></small></div>
-      <small class="muted" id="phLatest">latest: —</small>
-      <canvas id="phChart" class="spark"></canvas>
-    </article>
+    <section class="hero">
+      <h2>Greenhouse · Live</h2>
+      <p>Device <strong>pi5-greenhouse-01</strong>. Pulls securely from Azure Functions (key stays in your browser).</p>
+      <div class="controls">
+        <button id="btnRefresh" class="primary">Refresh</button>
+        <span class="chip" id="lastSync">no data yet</span>
+        <span class="chip">Auto-refresh <span id="autoEvery">30s</span></span>
+      </div>
 
-    <article class="panel">
-      <header class="muted">TDS (ppm)</header>
-      <div class="kpi"><div class="value" id="tdsValue">—</div><small id="tdsDelta"></small></div>
-      <small class="muted" id="tdsLatest">latest: —</small>
-      <canvas id="tdsChart" class="spark"></canvas>
-    </article>
+      <div id="ownerPanel" class="owner panel" style="margin-top:12px">
+        <div class="row" style="gap:12px; flex-wrap:wrap">
+          <div style="flex: 1 1 240px">
+            <div class="muted" style="font-size:12px">Cloud Host</div>
+            <input id="host" spellcheck="false" value="https://func-areka-hydro-sn-fzdja9egd8htaycm.switzerlandnorth-01.azurewebsites.net" />
+          </div>
+          <div style="flex: 1 1 240px">
+            <div class="muted" style="font-size:12px">Device Id</div>
+            <input id="device" spellcheck="false" value="pi5-greenhouse-01" />
+          </div>
+          <div style="flex: 1 1 320px">
+            <div class="muted" style="font-size:12px">Function Key (stored only in this browser)</div>
+            <input id="fnkey" spellcheck="false" placeholder="paste once → stays local" />
+          </div>
+        </div>
+        <div class="controls" style="margin-top:12px">
+          <button id="btnSave" class="primary">Save</button>
+          <button id="btnConnect">Connect</button>
+          <button id="btnClear" class="ghost">Clear key</button>
+          <span class="muted">Shortcut: press <span class="kbd">g</span> then <span class="kbd">o</span> to toggle Owner panel.</span>
+        </div>
+      </div>
+    </section>
 
-    <article class="panel">
-      <header class="muted">Water °C</header>
-      <div class="kpi"><div class="value" id="waterValue">—</div><small>°C</small></div>
-      <small class="muted" id="waterLatest">latest: —</small>
-    </article>
+    <main class="grid">
+      <article class="card third">
+        <h3>pH</h3>
+        <div class="big" id="ph-val">—</div>
+        <div class="row">
+          <div class="sub" id="ph-time">latest: —</div>
+          <div class="trend" id="ph-trend"></div>
+        </div>
+        <svg class="spark" id="ph-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>
+      </article>
 
-    <article class="panel">
-      <header class="muted">Air °C</header>
-      <div class="kpi"><div class="value" id="airValue">—</div><small>°C</small></div>
-      <small class="muted" id="airLatest">latest: —</small>
-    </article>
+      <article class="card third">
+        <h3>TDS (ppm)</h3>
+        <div class="big" id="tds-val">—</div>
+        <div class="row">
+          <div class="sub" id="tds-time">latest: —</div>
+          <div class="trend" id="tds-trend"></div>
+        </div>
+        <svg class="spark" id="tds-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>
+      </article>
 
-    <article class="panel">
-      <header class="muted">Humidity %</header>
-      <div class="kpi"><div class="value" id="humValue">—</div><small>%</small></div>
-      <small class="muted" id="humLatest">latest: —</small>
-    </article>
-  </section>
+      <article class="card third">
+        <h3>Water °C</h3>
+        <div class="big" id="water-val">—</div>
+        <div class="row">
+          <div class="sub" id="water-time">latest: —</div>
+          <div class="trend" id="water-trend"></div>
+        </div>
+        <svg class="spark" id="water-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>
+      </article>
 
-  <section class="panel" style="margin-top:1rem">
-    <h4 style="margin-bottom:.4rem">Recent Cloud Samples</h4>
-    <div class="table-wrap">
-      <table id="samples">
-        <thead><tr><th>ts</th><th>sensor</th><th class="right">value</th><th>deviceId</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <small class="muted" id="rowCount">0 rows</small>
-  </section>
-</main>
+      <article class="card half">
+        <h3>Air °C</h3>
+        <div class="big" id="air-val">—</div>
+        <div class="row">
+          <div class="sub" id="air-time">latest: —</div>
+          <div class="trend" id="air-trend"></div>
+        </div>
+        <svg class="spark" id="air-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>
+      </article>
 
-<script>
-/* ============ helpers & UI ============ */
-const $ = (q)=>document.querySelector(q);
-const els = {
-  statusChip: $('#statusChip'), syncBadge: $('#syncBadge'),
-  btnRefresh: $('#btnRefresh'), btnAuto: $('#btnAuto'),
-  ownerToggle: $('#ownerToggle'), ownerPanel: $('#ownerPanel'),
-  host: $('#host'), deviceId: $('#deviceId'), fnKey: $('#fnKey'),
-  btnSave: $('#btnSave'), btnConnect: $('#btnConnect'), btnClearKey: $('#btnClearKey'),
-  deviceIdText: $('#deviceIdText'),
-  phValue: $('#phValue'), phDelta: $('#phDelta'), phLatest: $('#phLatest'),
-  tdsValue: $('#tdsValue'), tdsDelta: $('#tdsDelta'), tdsLatest: $('#tdsLatest'),
-  waterValue: $('#waterValue'), waterLatest: $('#waterLatest'),
-  airValue: $('#airValue'), airLatest: $('#airLatest'),
-  humValue: $('#humValue'), humLatest: $('#humLatest'),
-  samplesBody: $('#samples tbody'), rowCount: $('#rowCount')
-};
-let auto=false, autoTimer=null, charts={ph:null, tdsppm:null};
+      <article class="card half">
+        <h3>Humidity %</h3>
+        <div class="big" id="hum-val">—</div>
+        <div class="row">
+          <div class="sub" id="hum-time">latest: —</div>
+          <div class="trend" id="hum-trend"></div>
+        </div>
+        <svg class="spark" id="hum-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>
+      </article>
 
-function setStatus(ok){ els.statusChip.textContent = ok?'online':'offline'; els.statusChip.classList.toggle('success',ok); els.statusChip.classList.toggle('danger',!ok); }
-function setSync(txt){ els.syncBadge.textContent = txt; }
+      <article class="card" style="grid-column: span 12">
+        <div class="row"><h3>Recent Cloud Samples</h3><span class="sub" id="count"></span></div>
+        <div id="table" class="panel" style="overflow:auto;border-radius:12px;margin-top:10px">
+          <table style="width:100%;border-collapse:collapse;min-width:640px">
+            <thead>
+              <tr style="text-align:left;font-size:12px;color:var(--muted)">
+                <th style="padding:10px;border-bottom:1px solid var(--border)">ts</th>
+                <th style="padding:10px;border-bottom:1px solid var(--border)">sensor</th>
+                <th style="padding:10px;border-bottom:1px solid var(--border)">value</th>
+                <th style="padding:10px;border-bottom:1px solid var(--border)">deviceId</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </article>
+    </main>
 
-/* ============ config ============ */
-function loadCfg(){
-  els.host.value     = localStorage.getItem('areka_host')   || '';
-  els.deviceId.value = localStorage.getItem('areka_device') || 'pi5-greenhouse-01';
-  els.fnKey.value    = localStorage.getItem('areka_fnkey')  || '';
-  els.deviceIdText.textContent = els.deviceId.value || '—';
-}
-function saveCfg(){
-  localStorage.setItem('areka_host', (els.host.value||'').trim());
-  localStorage.setItem('areka_device', (els.deviceId.value||'').trim());
-  if ((els.fnKey.value||'').trim()) localStorage.setItem('areka_fnkey', (els.fnKey.value||'').trim());
-  els.deviceIdText.textContent = els.deviceId.value || '—';
-}
-function clearKey(){ localStorage.removeItem('areka_fnkey'); els.fnKey.value=''; }
+    <footer>
+      Built for the Areka greenhouse • d3m3t3r.me • Auto refresh every <span id="every">30s</span>. Your key never leaves your browser.
+    </footer>
+  </div>
 
-/* ============ data & normalization ============ */
-// Only change you needed: alias incoming sensor names so TDS shows up.
-function canonSensor(s){
-  if (!s) return '';
-  s = (''+s).toLowerCase();
-  const map = {
-    tds:'tdsppm', ec:'tdsppm', conductivity:'tdsppm',
-    air:'tempC', airc:'tempC', temperature:'tempC', tempc:'tempC',
-    water:'waterC', waterc:'waterC', watertemp:'waterC',
-    hum:'humidity', rh:'humidity'
-  };
-  return map[s] || s;
-}
-function parseNum(x){ const n = Number(x); return isFinite(n) ? n : NaN; }
+  <script>
+    // ——— Settings (persisted locally) ———
+    const S = {
+      get host(){ return localStorage.getItem('demeter.host') || 'https://func-areka-hydro-sn-fzdja9egd8htaycm.switzerlandnorth-01.azurewebsites.net'; },
+      set host(v){ localStorage.setItem('demeter.host', v.trim()); },
+      get device(){ return localStorage.getItem('demeter.device') || 'pi5-greenhouse-01'; },
+      set device(v){ localStorage.setItem('demeter.device', v.trim()); },
+      get key(){ return localStorage.getItem('demeter.key') || ''; },
+      set key(v){ v ? localStorage.setItem('demeter.key', v.trim()) : localStorage.removeItem('demeter.key'); }
+    };
 
-async function fetchProbes(top=200){
-  const base   = (localStorage.getItem('areka_host')||'').replace(/\/+$/,'');
-  const device = localStorage.getItem('areka_device')||'';
-  const code   = localStorage.getItem('areka_fnkey') || '';
-  if (!base || !device) throw new Error('Missing host or device');
+    // ——— Helpers ———
+    const $ = sel => document.querySelector(sel);
+    const fmt = (n, d=2) => (n==null || isNaN(n)) ? '—' : Number(n).toFixed(d);
+    const timeAgo = iso => {
+      if(!iso) return '—';
+      const t = new Date(iso).getTime();
+      if(Number.isNaN(t)) return iso;
+      const s = Math.max(0, (Date.now() - t)/1000);
+      if(s<60) return `${Math.floor(s)}s ago`;
+      const m = s/60; if(m<60) return `${Math.floor(m)}m ago`;
+      const h = m/60; if(h<24) return `${Math.floor(h)}h ago`;
+      const d = h/24; return `${Math.floor(d)}d ago`;
+    };
+    const bySensor = (arr) => {
+      const m = new Map();
+      for(const it of arr){
+        const c = it.c || it;
+        const k = c.sensor || c.type || 'unknown';
+        (m.get(k) || m.set(k, []).get(k)).push(c);
+      }
+      for(const [k,v] of m) v.sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+      return m;
+    };
+    const spark = (el, values) => {
+      if(!values || values.length<2){ el.innerHTML=''; return; }
+      const w=100, h=30, pad=1;
+      const min = Math.min(...values), max = Math.max(...values);
+      const norm = v => max===min ? h/2 : h - ((v-min)/(max-min))*h;
+      const step = (w-2*pad)/(values.length-1);
+      let d='M '+pad+' '+norm(values[0]).toFixed(2);
+      values.forEach((v,i)=>{
+        if(i===0) return;
+        d+=' L '+(pad+i*step).toFixed(2)+' '+norm(v).toFixed(2);
+      });
+      el.innerHTML = `<path d="${d}" fill="none" stroke="url(#g)" stroke-width="1.5"/>`
+                    + `<defs><linearGradient id="g" x1="0" x2="1"><stop offset="0%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--brand').trim()}"/><stop offset="100%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--brand-2').trim()}"/></linearGradient></defs>`;
+    };
 
-  const url = `${base}/api/Probes?deviceId=${encodeURIComponent(device)}&top=${top}${code?`&code=${encodeURIComponent(code)}`:''}`;
-  const res = await fetch(url, {cache:'no-store'});
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const raw = await res.json();
+    // ——— DOM wires ———
+    const els = {
+      status: $('#status'),
+      lastSync: $('#lastSync'),
+      every: $('#every'), autoEvery: $('#autoEvery'),
+      host: $('#host'), device: $('#device'), fnkey: $('#fnkey'),
+      btnOwner: $('#btnOwner'), ownerPanel: $('#ownerPanel'),
+      btnSave: $('#btnSave'), btnConnect: $('#btnConnect'), btnClear: $('#btnClear'),
+      btnRefresh: $('#btnRefresh'),
+      ph: { val:$('#ph-val'), time:$('#ph-time'), trend:$('#ph-trend'), spark:$('#ph-spark') },
+      tds:{ val:$('#tds-val'), time:$('#tds-time'), trend:$('#tds-trend'), spark:$('#tds-spark') },
+      water:{ val:$('#water-val'), time:$('#water-time'), trend:$('#water-trend'), spark:$('#water-spark') },
+      air:{ val:$('#air-val'), time:$('#air-time'), trend:$('#air-trend'), spark:$('#air-spark') },
+      hum:{ val:$('#hum-val'), time:$('#hum-time'), trend:$('#hum-trend'), spark:$('#hum-spark') },
+      rows: $('#rows'), count: $('#count'),
+    };
 
-  const rows = (Array.isArray(raw)?raw:[])
-    .map(x => x && x.c ? x.c : x)
-    .map(r => ({
-      ts: r.ts || r.time || r.timestamp,
-      sensor: canonSensor(r.sensor),
-      value: parseNum(r.value ?? r.val),
-      deviceId: r.deviceId || r.deviceid || r.device || ''
-    }))
-    .filter(r => r.ts && r.sensor);
-  rows.sort((a,b)=> new Date(a.ts) - new Date(b.ts));
-  return rows;
-}
+    // ——— Init owner fields ———
+    const loadFields = () => { els.host.value=S.host; els.device.value=S.device; els.fnkey.value=S.key; };
+    loadFields();
 
-function latestBySensor(rows){
-  const m={}; for (const r of rows){ if(!m[r.sensor] || new Date(r.ts)>new Date(m[r.sensor].ts)) m[r.sensor]=r; }
-  return m;
-}
-function series(rows, key){ return rows.filter(r=> r.sensor===key && isFinite(r.value)); }
-function deltaText(arr, digits=2){
-  if (arr.length<2) return '';
-  const a = arr[arr.length-2].value, b = arr[arr.length-1].value, d = b-a;
-  if (!isFinite(d) || d===0) return '';
-  return `${d>0?'+':'−'}${Math.abs(d).toFixed(digits)}`;
-}
+    // ——— Toggle owner panel ———
+    let goCombo = '';
+    document.addEventListener('keydown', (e) => {
+      goCombo = (goCombo + e.key.toLowerCase()).slice(-2);
+      if(goCombo === 'go'){ els.ownerPanel.classList.toggle('open'); goCombo=''; }
+    });
+    els.btnOwner.addEventListener('click', () => els.ownerPanel.classList.toggle('open'));
 
-/* ============ rendering ============ */
-function ensureChart(name, canvasId, color){
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  if (charts[name]) return charts[name];
-  charts[name] = new Chart(ctx, {
-    type:'line',
-    data:{ labels:[], datasets:[{ data:[], borderColor:color, pointRadius:0, borderWidth:2, tension:.3, fill:false }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{intersect:false,mode:'index'}}, scales:{x:{display:false}, y:{display:false}} }
-  });
-  return charts[name];
-}
-function fmtTs(s){ try{ return new Date(s).toISOString().replace('T',' ').replace('Z',''); } catch { return s||'—'; } }
+    // ——— Save/Connect/Clear ———
+    els.btnSave.addEventListener('click', () => {
+      S.host = els.host.value; S.device = els.device.value; if(els.fnkey.value) S.key = els.fnkey.value;
+      loadFields();
+      alert('Saved to this browser.');
+    });
+    els.btnClear.addEventListener('click', () => {
+      S.key=''; els.fnkey.value='';
+      alert('Key cleared from this browser.');
+    });
+    els.btnConnect.addEventListener('click', async () => {
+      await refresh();
+    });
+    els.btnRefresh.addEventListener('click', () => refresh());
 
-function renderTable(rows){
-  const tbody = els.samplesBody; tbody.innerHTML='';
-  const limit = Math.min(rows.length, 400);
-  for (let i = rows.length-1; i >= rows.length-limit; i--){
-    const r = rows[i]; if (!r) break;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${fmtTs(r.ts)}</td><td>${r.sensor}</td><td class="right mono">${isFinite(r.value)?r.value:''}</td><td>${r.deviceId||''}</td>`;
-    tbody.appendChild(tr);
-  }
-  els.rowCount.textContent = `${limit} rows`;
-}
+    // ——— Fetch from Cloud ———
+    async function fetchCloud(top=120){
+      if(!S.key){ throw new Error('No function key set'); }
+      const url = new URL('/api/Probes', S.host);
+      url.searchParams.set('deviceId', S.device);
+      url.searchParams.set('top', String(top));
+      url.searchParams.set('code', S.key);
+      const r = await fetch(url.toString(), { cache:'no-store' });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const data = await r.json();
+      return Array.isArray(data) ? data : [];
+    }
 
-function renderAll(rows){
-  renderTable(rows);
-  const latest = latestBySensor(rows);
+    // ——— Render helpers ———
+    function setStatus(ok){
+      els.status.textContent = ok ? 'online' : 'offline';
+      els.status.style.color = ok ? 'var(--bg)' : 'var(--text)';
+      els.status.style.background = ok ? 'linear-gradient(135deg,var(--brand),var(--brand-2))' : '#10161c';
+      els.status.style.border = ok ? 'none' : '1px solid var(--border)';
+    }
+    function renderLatest(map, key, target, unit='', dp=2){
+      const arr = map.get(key) || [];
+      const latest = arr[0], prev = arr[1];
+      const v = latest?.value, p = prev?.value;
+      target.val.textContent = unit ? `${fmt(v, dp)} ${unit}` : fmt(v, dp);
+      target.time.textContent = latest ? `latest: ${new Date(latest.ts).toLocaleTimeString()} (${timeAgo(latest.ts)})` : 'latest: —';
+      if(v!=null && p!=null){
+        const delta = v - p;
+        const dir = delta>0 ? '▲' : delta<0 ? '▼' : '•';
+        const cls = delta>0 ? 'good' : delta<0 ? 'bad' : '';
+        target.trend.className = 'trend ' + cls;
+        target.trend.textContent = `${dir} ${fmt(Math.abs(delta), dp)}`;
+      }else{
+        target.trend.className = 'trend'; target.trend.textContent='—';
+      }
+      const series = arr.slice(0, 32).map(x=>x.value).reverse();
+      spark(target.spark, series);
+    }
+    function renderTable(list){
+      els.count.textContent = `${list.length} rows`;
+      const rows = list.slice(0, 50).map(row=>{
+        const c=row.c||row;
+        return `<tr>
+          <td style="padding:10px;border-bottom:1px solid var(--border)">${c.ts}</td>
+          <td style="padding:10px;border-bottom:1px solid var(--border)">${c.sensor}</td>
+          <td style="padding:10px;border-bottom:1px solid var(--border)">${c.value}</td>
+          <td style="padding:10px;border-bottom:1px solid var(--border)">${c.deviceId||''}</td>
+        </tr>`;
+      }).join('');
+      els.rows.innerHTML = rows || `<tr><td colspan="4" class="muted" style="padding:12px">No data.</td></tr>`;
+    }
 
-  // pH
-  const phArr = series(rows,'ph');
-  const phLast = latest['ph'];
-  $('#phValue').textContent = phLast ? Number(phLast.value).toFixed(2) : '—';
-  $('#phLatest').textContent = phLast ? `latest: ${fmtTs(phLast.ts)}` : 'latest: —';
-  const phChart = ensureChart('ph','phChart','#60a5fa');
-  phChart.data.labels = phArr.map(r=>r.ts);
-  phChart.data.datasets[0].data = phArr.map(r=>r.value);
-  phChart.update('none');
-  $('#phDelta').textContent = deltaText(phArr,2);
+    // ——— Refresh flow ———
+    async function refresh(){
+      try{
+        if(!S.key){ alert('Owner: paste your Function key in the panel and Save.'); return; }
+        setStatus(false);
+        els.lastSync.textContent = 'fetching…';
+        const list = await fetchCloud(200);
+        const map = bySensor(list);
 
-  // TDS — now fed by either "tds" or already-"tdsppm"
-  const tdsArr = series(rows,'tdsppm');
-  const tdsLast = latest['tdsppm'];
-  $('#tdsValue').textContent = tdsLast ? Number(tdsLast.value).toFixed(0) : '—';
-  $('#tdsLatest').textContent = tdsLast ? `latest: ${fmtTs(tdsLast.ts)}` : 'latest: —';
-  const tdsChart = ensureChart('tdsppm','tdsChart','#34d399');
-  tdsChart.data.labels = tdsArr.map(r=>r.ts);
-  tdsChart.data.datasets[0].data = tdsArr.map(r=>r.value);
-  tdsChart.update('none');
-  $('#tdsDelta').textContent = deltaText(tdsArr,0);
+        renderLatest(map, 'ph', els.ph, '', 2);
+        renderLatest(map, 'tdsppm', els.tds, 'ppm', 0);
+        renderLatest(map, 'waterC', els.water, '°C', 1);
+        renderLatest(map, 'tempC', els.air, '°C', 1);
+        renderLatest(map, 'humidity', els.hum, '%', 0);
 
-  // Singles
-  const water = latest['waterC']; $('#waterValue').textContent = water? Number(water.value).toFixed(1) : '—'; $('#waterLatest').textContent = water? `latest: ${fmtTs(water.ts)}` : 'latest: —';
-  const air   = latest['tempC'];  $('#airValue').textContent   = air?   Number(air.value).toFixed(1)   : '—'; $('#airLatest').textContent   = air?   `latest: ${fmtTs(air.ts)}`   : 'latest: —';
-  const hum   = latest['humidity'];$('#humValue').textContent   = hum?   Number(hum.value).toFixed(0)   : '—'; $('#humLatest').textContent   = hum?   `latest: ${fmtTs(hum.ts)}`   : 'latest: —';
-}
+        renderTable(list);
+        setStatus(true);
+        els.lastSync.textContent = 'synced ' + new Date().toLocaleTimeString();
+      }catch(err){
+        console.error(err);
+        setStatus(false);
+        els.lastSync.textContent = 'error – ' + (err.message || String(err));
+      }
+    }
 
-/* ============ actions ============ */
-async function refresh(){
-  try {
-    setSync('syncing…');
-    const rows = await fetchProbes(200);
-    renderAll(rows);
-    setStatus(true);
-    setSync(`synced ${new Date().toTimeString().slice(0,8)}`);
-  } catch (e) {
-    console.error(e);
-    setStatus(false);
-    setSync('error – Failed to fetch');
-  }
-}
-function setAuto(on){
-  auto=!!on; if (autoTimer) clearInterval(autoTimer);
-  els.btnAuto.textContent = auto ? 'Auto-refresh 30s (on)' : 'Auto-refresh 30s';
-  els.btnAuto.classList.toggle('secondary', auto);
-  if (auto) autoTimer = setInterval(refresh, 30000);
-}
+    // ——— Auto refresh (30s) ———
+    const EVERY = 30_000;
+    els.every.textContent = (EVERY/1000)+'s';
+    els.autoEvery.textContent = (EVERY/1000)+'s';
+    setInterval(() => { if(S.key) refresh(); }, EVERY);
 
-/* ============ events ============ */
-els.btnRefresh.addEventListener('click', refresh);
-els.btnAuto.addEventListener('click', ()=> setAuto(!auto));
-els.ownerToggle.addEventListener('click', ()=> els.ownerPanel.style.display = (els.ownerPanel.style.display==='none' ? 'block' : 'none'));
-els.btnSave.addEventListener('click', ()=>{ saveCfg(); refresh(); });
-els.btnConnect.addEventListener('click', refresh);
-els.btnClearKey.addEventListener('click', clearKey);
-
-// g then o shortcut
-let lastKey='', lastTime=0;
-window.addEventListener('keydown', (e)=>{
-  const now=Date.now(); if (now-lastTime>1200) lastKey='';
-  if (e.key.toLowerCase()==='g'){ lastKey='g'; lastTime=now; return; }
-  if (e.key.toLowerCase()==='o' && lastKey==='g'){ els.ownerPanel.style.display = (els.ownerPanel.style.display==='none' ? 'block' : 'none'); lastKey=''; }
-});
-
-/* ============ boot ============ */
-loadCfg(); setAuto(false); setStatus(false); refresh();
-</script>
+    // Kick once if key already saved
+    if(S.key){ refresh(); }
+  </script>
 </body>
 </html>
