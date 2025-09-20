@@ -226,16 +226,44 @@
       const h = m/60; if(h<24) return `${Math.floor(h)}h ago`;
       const d = h/24; return `${Math.floor(d)}d ago`;
     };
+
+    // 🔧 Canonicalize sensor keys so "tds" appears under the TDS (ppm) card
+    function canonSensor(name){
+      const l = (name||'').toString().toLowerCase();
+      switch(l){
+        case 'tds':
+        case 'ec':
+        case 'conductivity':
+          return 'tdsppm';
+        case 'water':
+        case 'waterc':
+        case 'watertemp':
+          return 'waterC';
+        case 'air':
+        case 'airc':
+        case 'tempc':
+        case 'temperature':
+          return 'tempC';
+        case 'hum':
+        case 'rh':
+          return 'humidity';
+        default:
+          return name || 'unknown';
+      }
+    }
+
     const bySensor = (arr) => {
       const m = new Map();
       for(const it of arr){
         const c = it.c || it;
-        const k = c.sensor || c.type || 'unknown';
+        const raw = c.sensor || c.type || 'unknown';
+        const k = canonSensor(raw);              // 👈 use canonical key
         (m.get(k) || m.set(k, []).get(k)).push(c);
       }
       for(const [k,v] of m) v.sort((a,b)=> new Date(b.ts)-new Date(a.ts));
       return m;
     };
+
     const spark = (el, values) => {
       if(!values || values.length<2){ el.innerHTML=''; return; }
       const w=100, h=30, pad=1;
@@ -356,11 +384,11 @@
         const list = await fetchCloud(200);
         const map = bySensor(list);
 
-        renderLatest(map, 'ph', els.ph, '', 2);
-        renderLatest(map, 'tdsppm', els.tds, 'ppm', 0);
-        renderLatest(map, 'waterC', els.water, '°C', 1);
-        renderLatest(map, 'tempC', els.air, '°C', 1);
-        renderLatest(map, 'humidity', els.hum, '%', 0);
+        renderLatest(map, 'ph',       els.ph,    '',   2);
+        renderLatest(map, 'tdsppm',   els.tds,   'ppm',0); // now populated via canonSensor()
+        renderLatest(map, 'waterC',   els.water, '°C', 1);
+        renderLatest(map, 'tempC',    els.air,   '°C', 1);
+        renderLatest(map, 'humidity', els.hum,   '%',  0);
 
         renderTable(list);
         setStatus(true);
