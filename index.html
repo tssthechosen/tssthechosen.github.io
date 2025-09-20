@@ -44,7 +44,7 @@
     .hero h2 {margin:0 0 6px 0; font-size: clamp(20px,2vw,24px)}
     .hero p {margin:0;color:var(--muted)}
     .controls {display:flex;flex-wrap:wrap;gap:10px; align-items:center;margin-top:14px}
-    button, input, select {
+    button, input {
       background: var(--card); color:var(--text); border:1px solid var(--border);
       border-radius:10px; padding:9px 12px; font: inherit;
     }
@@ -209,9 +209,17 @@
       set host(v){ localStorage.setItem('demeter.host', v.trim()); },
       get device(){ return localStorage.getItem('demeter.device') || 'pi5-greenhouse-01'; },
       set device(v){ localStorage.setItem('demeter.device', v.trim()); },
-      get key(){ return localStorage.getItem('demeter.key') || ''; },
+      get key(){ return localStorage.getItem('demeter.key') || ''; }, // unused in keyless
       set key(v){ v ? localStorage.setItem('demeter.key', v.trim()) : localStorage.removeItem('demeter.key'); }
     };
+
+    // Auto-migrate any cached Azure host to the Worker host to prevent 401s
+    (() => {
+      const h = localStorage.getItem('demeter.host');
+      if (h && /azurewebsites\.net/i.test(h)) {
+        localStorage.setItem('demeter.host', 'https://d3m3t3r.me');
+      }
+    })();
 
     // ——— Helpers ———
     const $ = sel => document.querySelector(sel);
@@ -318,12 +326,16 @@
     els.btnConnect.addEventListener('click', async () => { await refresh(); });
     els.btnRefresh.addEventListener('click', () => refresh());
 
-    // ——— Fetch from Cloud (keyless via Worker) ———
+    // ——— Fetch (KEYLESS via Worker) ———
+    function workerHost(){
+      const h = S.host || 'https://d3m3t3r.me';
+      return /azurewebsites\.net/i.test(h) ? 'https://d3m3t3r.me' : h; // force Worker if stale value is cached
+    }
     async function fetchCloud(top=120){
-      const url = new URL('/api/Probes', S.host);
+      const url = new URL('/api/Probes', workerHost());
       url.searchParams.set('deviceId', S.device);
       url.searchParams.set('top', String(top));
-      // No 'code' param — Cloudflare Worker injects it server-side
+      // No `code` — Worker injects it
       const r = await fetch(url.toString(), { cache:'no-store' });
       if(!r.ok) throw new Error('HTTP '+r.status);
       const data = await r.json();
